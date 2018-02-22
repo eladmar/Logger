@@ -3,10 +3,10 @@
 
 #ifdef WIN32
 #include <Windows.h>
-#define LocVer SRWLOCK
+#define wrC_lock SRWLOCK
 #else
 #include <pthread.h>
-#define LocVer pthread_rwlock_t
+#define wrC_lock pthread_rwlock_t
 #endif
 #include <iostream>
 #include <thread>
@@ -20,7 +20,7 @@ public:
 	void ReaderUnlock();
 	void WriterUnlock();
 private:
-	LocVer lock;
+	wrC_lock lock;
 
 	ReadWriteLocker(const ReadWriteLocker&);//not copyable
 	void operator=(const ReadWriteLocker&);//not copyable
@@ -33,9 +33,7 @@ struct ReaderGuard
 {
 	inline ReaderGuard(ReadWriteLocker& lock): locker(lock)
 	{
-//	std::cout<<"ReaderLock\n";
 		locker.ReaderLock();
-//	std::cout<<"hereReaderLock\n";
 	}
 	inline ~ReaderGuard()
 	{
@@ -50,15 +48,11 @@ struct WriterGuard
 {
 	inline WriterGuard(ReadWriteLocker& lock): locker(lock)
 	{
-	//	std::cout<<"id:" <<std::this_thread::get_id()<<"WriterLock\n";
 		locker.WriterLock();
-//		std::cout<<"hereWriterLock\n";
 	}
 	inline ~WriterGuard()
 	{
-	//	std::cout<<"WriterUnlock\n";
 		locker.WriterUnlock();
-	//std::cout<<"WriterUnlock ddd\n";
 	}
 private:
 	ReadWriteLocker& locker;

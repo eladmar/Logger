@@ -34,6 +34,7 @@
 
 enum class Level {
 	LOG_INFORMATION,
+	LOG_DEBUG,
 	LOG_ERROR,
 	LOG_FATAL
 };

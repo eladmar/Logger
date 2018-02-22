@@ -20,33 +20,27 @@ using namespace std;
 
 LOG_EXPORT Logger& Logger::GetInstance()
 {
-
-//	[](){cout<<"bb\n";}();
 	static Logger x;
-//		std::cout<<"id:" <<std::this_thread::get_id()<<" GetInstance\n";
 	return x;
 }
 
 
 LOG_EXPORT void Logger::Init(const LogConfig& config)
 {
-//		std::cout<<"id:" <<std::this_thread::get_id()<<"Init\n";
 	WriterGuard g(dbLocker);
 	
 	if(	config.begin() != config.end())
 	{
-	db.insert(config.begin(),config.end());
-	
-	MKDIR(LOG_DIR);
-	CreateFiles();
-//	cout<<"after CreateFiles \n";
+		db.insert(config.begin(),config.end());
+		MKDIR(LOG_DIR);
+		CreateFiles();
 	}
 }
 
 
 Logger::Logger() :queue(),
 				  runFlag(true),
-				  executor(&Logger::WriteToFiles,this)
+				  executor(&Logger::WriteToFiles,this) //starts the thread that write the logs to files
 {}
 
 
@@ -67,13 +61,13 @@ void Logger::WriteToFiles()
 
 void Logger::CreateFiles()
 {
-//	std::cout<<"id:" <<std::this_thread::get_id()<<" CreateFiles\n";
-	//get the files names and palece them in files db(files)
 	auto iter = db.begin();
+
 	for(;iter != db.end(); ++iter)
 	{
 		auto& fileALevelSet = iter->second;
 		auto setIter = fileALevelSet.begin();
+
 		for(;setIter != fileALevelSet.end(); ++setIter)
 		{
 			const string& fileName = setIter->first;
@@ -84,20 +78,10 @@ void Logger::CreateFiles()
 				string pathAndName(LOG_DIR);
 				pathAndName+= '/';
                 pathAndName+= fileName;
-
-				auto x = 	shared_ptr<ofstream>(new std::ofstream(pathAndName ,ios::app|ios_base::out));
-	//			getchar();
-				assert(x);
-		//		[&](){cout<<"id:" <<std::this_thread::get_id()<<" -"<<fileName<<"    "<<pathAndName<<x<<"\n";}();
-		//		getchar();
-				files[fileName]= x;
-        //    	cout<<"need to get here\n";
+				files[fileName]= shared_ptr<ofstream>(new std::ofstream(pathAndName ,ios::app|ios_base::out));	
 			}
-		//		cout<<"j\n";
 		}
-	//		cout<<"c\n";
 	}
-	//	cout<<"d\n";
 }
 
 
@@ -108,7 +92,7 @@ void Logger::CreateFiles()
 std::string Logger::Time()const
 {
 	char timeStr[64];
-	 time_t rawtime;
+	time_t rawtime;
     struct tm * timeinfo;
     time(&rawtime);
     timeinfo = localtime (&rawtime);
@@ -120,27 +104,23 @@ std::string Logger::Time()const
 LOG_EXPORT const std::string& Logger::ToStrLevel(Level level)
 {
 	static const string LOG_INFORMATION("LOG_INFORMATION");
+	static const string LOG_DEBUG("LOG_DEBUG");
 	static const string LOG_ERROR("LOG_ERROR");
 	static const string LOG_FATAL("LOG_FATAL");
-
-	if( level == Level::LOG_INFORMATION)
+	switch(Level)
 	{
-		return LOG_INFORMATION;
+		case Level::LOG_INFORMATION:
+			return LOG_INFORMATION;
+		case Level::LOG_DEBUG:
+			return LOG_DEBUG;
+		case Level::LOG_ERROR:
+			return LOG_ERROR;
+		case Level::LOG_FATAL:
+			return LOG_FATAL;
+		default:
+			throw runtime_error("no suitable match ");
+			return LOG_FATAL;
 	}
-	else if(level == Level::LOG_ERROR)
-	{
-		return LOG_ERROR;
-	}
-	else if(level == Level::LOG_FATAL)
-	{
-		return LOG_FATAL;
-	}
-	else
-	{
-		throw runtime_error("no suitable match ");
-		return LOG_FATAL;
-	}
-
 }
 
 
@@ -149,6 +129,10 @@ LOG_EXPORT Level Logger::ToLevel(const std::string& levelStr)
 	if( levelStr == "LOG_INFORMATION")
 	{
 		return Level::LOG_INFORMATION;
+	}
+	if( levelStr == "LOG_DEBUG")
+	{
+		return Level::LOG_DEBUG;
 	}
 	else if(levelStr == "LOG_ERROR")
 	{
@@ -179,7 +163,15 @@ LOG_EXPORT Logger::~Logger()
 
 void Logger::SetLogStr(string& log,const char* function,const char* file, Level level, const std::string& module, const std::string& commment)
 {
-	log =  Time() + " ; " + module + " ; " + function +   " ; " + ToStrLevel(level) + " ; " + commment + "\n";
+	try
+	{
+		log =  Time() + " ; " + module + " ; " + function +   " ; " + ToStrLevel(level) + " ; " + commment + "\n";
+	}
+	catch(std::runtime_error& err)
+	{
+		log =  Time() + " ; " + module + " ; " + function +   " ;Logger warning: Invalid Level ; " + commment + "\n";
+	}
+		
 }
 
 
@@ -214,7 +206,6 @@ LOG_EXPORT void Logger::InnerReport(const std::string& module, const std::string
 	Package pack;
 	pack.log =  Time()  + ": " + commment + "\n";
 	SetNeededFiles(pack.files, Level::LOG_INFORMATION, module);
-
     //send the packege to the writer thread
 	queue.Push(pack);
 }
